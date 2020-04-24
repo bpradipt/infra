@@ -1,0 +1,76 @@
+---
+- name: Setup any hypervisors
+  hosts: hypervisors
+  tasks:
+    - name: Install required packages
+      dnf:
+        name:
+          - bridge-utils
+          - libvirt-client
+          - python3-libvirt
+          - python3-lxml
+          - libvirt-daemon-kvm
+          - qemu-img
+          - qemu-kvm
+          - virt-install
+          - cloud-utils
+          - sshpass
+        state: latest
+
+    - name: Check if libvirt image_path exists
+      stat:
+        path: "{{ image_path }}"
+      register: st
+
+    - name: Create libvirt image_path exists
+      file:
+        path: "{{ image_path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "u=rwx,g=rwx,o=rx"
+        seuser: "system_u"
+        setype: "virt_var_lib_t"
+      register:
+        image_create
+      when:
+        - not st.stat.exists
+
+    - name: Allow libvirt to manage files in image_path
+      sefcontext:
+        target: "{{ image_path }}(/.*)?"
+        seuser: "system_u"
+        setype: "virt_var_lib_t"
+        state: present
+      when:
+        - image_create is changed
+
+    - name: Restart libvirtd
+      service:
+        name: libvirtd
+        state: restarted
+
+    - name: Define libvirt default pool
+      virt_pool:
+        command: define
+        name: default
+        xml: '{{ lookup("template", "default_storage_xml.j2") }}'
+
+    # Build a storage pool if it does not exist
+    - name: Build libvirt default pool
+      virt_pool:
+        command: build
+        name: default
+      ignore_errors: yes
+
+    # Ensure that a pool is active (needs to be defined and built first)
+    - name: Start libvirt default pool
+      virt_pool:
+        state: active
+        name: default
+
+    # Ensure that a given pool will be started at boot
+    - name: Enable autostart libvirt default pool
+      virt_pool:
+        autostart: yes
+        name: default
