@@ -6,4 +6,4 @@ This ansible playbook sets up libvirt and configures VM for nested KVM
 ansible-playbook -i inventory/hosts.yaml playbook/main.yaml
 ```
 
-Currently this is tested only on Fedora 31
+Currently this is tested only on Fedora 31. The default VM user is `fedora` and password is `passw0rd`. 
