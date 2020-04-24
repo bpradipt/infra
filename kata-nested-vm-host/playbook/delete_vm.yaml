@@ -1,0 +1,26 @@
+---
+- name: Delete VMs
+  hosts: hypervisors
+  tasks:
+    - name: get list of vms
+      virt: 
+        command: list_vms
+      register: vms
+      
+    - name: Destroy VM
+      virt:
+        name: "{{ vm.name }}"
+        command: destroy
+      when: vm.name in vms.list_vms
+
+    - name: Undefine VM
+      virt:
+        name: "{{ vm.name }}"
+        command: undefine
+      when: vm.name in vms.list_vms
+
+    - name: Delete VM artifacts
+      shell: |
+        rm -f "{{ image_path }}/{{ vm.disk }}"
+        rm -f "{{ vm_config_path }}/{{ vm.name }}_config.yaml"
+        rm -f "{{ image_path }}/{{ vm.config_drive_iso }}"
