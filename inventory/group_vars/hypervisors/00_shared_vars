@@ -2,3 +2,16 @@
 ansible_user: root
 ansible_python_interpreter: /usr/bin/python3
 image_path: /home/libvirt/image_store
+vm_config_path: /home/libvirt/vmconfig
+vm:
+  name: kata-fedora-00
+  image_download_url: "https://download.fedoraproject.org/pub/fedora-secondary/releases/31/Cloud/ppc64le/images/Fedora-Cloud-Base-31-1.9.ppc64le.qcow2"
+  image_base_name: "fedora-31-base.qcow2"
+  disk: "fedora-31-derived-kata.qcow2"
+  disk_size: 50G
+  config_drive_iso: "fedora-config-drive.iso"
+  cpus:
+  memory:
+  user: "fedora"
+  password: "$y$j9T$eN1cYAhwHXBShRP5ZsM8e0$QqYFgDvsEfWpKNm9jOwjp.3zDZ/fDaUBIRMLh9YIZo8"
+  ssh_key: ""

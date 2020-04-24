@@ -1,0 +1,45 @@
+---
+- name: Setup VMs
+  hosts: hypervisors
+  tasks:
+    - name: Check if config directory exists
+      stat:
+       path: "{{ vm_config_path }}"
+      register: vmconfig_dir
+
+    - name: "Ansible Create directory if not exists"
+      file:
+       path: "{{ vm_config_path }}"
+       state: directory
+      when: vmconfig_dir.stat.exists == false
+
+    - name: Download VM image
+      get_url:
+        url="{{ vm.image_download_url }}"
+        dest="{{ image_path }}/{{ vm.image_base_name }}"
+
+    - name: Create VM image
+      shell: |
+        qemu-img create -f qcow2 -b "{{ image_path }}/{{ vm.image_base_name }}" "{{ image_path }}/{{ vm.disk }}" "{{ vm.disk_size }}"
+
+    - name: Create Config Drive Input
+      template:
+        src: config.yaml.j2
+        dest: "{{ vm_config_path }}/{{ vm.name }}_config.yaml"
+
+    - name: Create config drive iso
+      shell: |
+        cloud-localds "{{ image_path }}/{{ vm.config_drive_iso }}" "{{ vm_config_path }}/{{ vm.name }}_config.yaml"
+
+    # Defining a VM and making is autostart with host. VM will be off after this task
+    - name: Define VM from xml and set autostart
+      virt:
+        command: define
+        name: "{{ vm.name }}"
+        xml: "{{ lookup('template', 'vm_template.xml.j2') }}"
+
+    - name: Start VM
+      virt:
+        name: "{{ vm.name }}"
+        state: running
+
