@@ -74,3 +74,18 @@
       virt_pool:
         autostart: yes
         name: default
+
+    # Check if Qemu has been overriden
+    - name: Check if emulator has been overriden
+      stat:
+        path: "{{ emulator }}.bin"
+      register: emulator_bin
+
+    # Setup emulator for nested KVM
+    - name: Setup Qemu Emulator with Nested KVM option
+      shell: |  
+          mv {{ emulator }} {{ emulator }}.bin
+          cp {{ playbook_dir }}/files/qemu_override {{ emulator }}
+          chmod +x {{ emulator }}
+          chcon -t qemu_exec_t {{ emulator }}
+      when: emulator_bin.stat.exists == False
