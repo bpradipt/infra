@@ -2,25 +2,40 @@
 - name: Delete VMs
   hosts: hypervisors
   tasks:
-    - name: get list of vms
+    - name: Get list of Running VMs
       virt: 
         command: list_vms
-      register: vms
+        state: running
+      register: vm_running_list
+
+    - name: Get list of all VMs
+      virt: 
+        command: list_vms
+      register: vm_list
       
     - name: Destroy VM
       virt:
-        name: "{{ vm.name }}"
+        name: "{{ item.name }}"
         command: destroy
-      when: vm.name in vms.list_vms
+      when: item.name in vm_running_list.list_vms
+      loop: "{{ vms }}"
+      loop_control:
+        label: "{{ item.name }}"
 
     - name: Undefine VM
       virt:
-        name: "{{ vm.name }}"
+        name: "{{ item.name }}"
         command: undefine
-      when: vm.name in vms.list_vms
+      when: item.name in vm_list.list_vms
+      loop: "{{ vms }}"
+      loop_control:
+        label: "{{ item.name }}"
 
     - name: Delete VM artifacts
       shell: |
-        rm -f "{{ image_path }}/{{ vm.disk }}"
-        rm -f "{{ vm_config_path }}/{{ vm.name }}_config.yaml"
-        rm -f "{{ image_path }}/{{ vm.config_drive_iso }}"
+        rm -f "{{ image_path }}/{{ item.disk }}"
+        rm -f "{{ vm_config_path }}/{{ item.name }}_config.yaml"
+        rm -f "{{ image_path }}/{{ item.config_drive_iso }}"
+      loop: "{{ vms }}"
+      loop_control:
+        label: "{{ item.name }}"
