@@ -50,24 +50,37 @@
         name: libvirtd
         state: restarted
 
+    - name: List libvirt pools
+      virt_pool:
+        command: list_pools
+      register: pool_list
+
     - name: Define libvirt default pool
       virt_pool:
         command: define
         name: default
         xml: '{{ lookup("template", "default_storage_xml.j2") }}'
+      when: '"default" not in pool_list.list_pools'
+
+    - name: Get libvirt default pool status
+      virt_pool:
+        command: status
+        name: default
+      register: default_pool
 
     # Build a storage pool if it does not exist
     - name: Build libvirt default pool
       virt_pool:
         command: build
         name: default
-      ignore_errors: yes
+      when: 'default_pool.status not in "active"' 
 
     # Ensure that a pool is active (needs to be defined and built first)
     - name: Start libvirt default pool
       virt_pool:
         state: active
         name: default
+      when: 'default_pool.status not in "active"' 
 
     # Ensure that a given pool will be started at boot
     - name: Enable autostart libvirt default pool
