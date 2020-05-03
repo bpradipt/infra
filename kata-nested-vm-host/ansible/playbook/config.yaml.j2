@@ -1,11 +1,11 @@
 #cloud-config
 package_upgrade: true
 users:
-  - name: "{{ vm.user }}"
+  - name: "{{ item.user }}"
     groups: wheel
     lock_passwd: false
-    passwd: "{{ vm.password }}"
+    passwd: "{{ item.password }}"
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh-authorized-keys:
-      - "{{ vm.ssh_key }}"
+      - "{{ item.ssh_key }}"

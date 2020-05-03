@@ -1,5 +1,5 @@
 <domain type='kvm' >
-  <name>{{ vm.name }}</name>
+  <name>{{ item.name }}</name>
   <memory unit='KiB'>16777216</memory>
   <currentMemory unit='KiB'>16777216</currentMemory>
   <vcpu placement='static'>8</vcpu>
@@ -21,12 +21,12 @@
   <devices>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
-      <source file="{{ image_path }}/{{ vm.disk }}"/>
+      <source file="{{ image_path }}/{{ item.disk }}"/>
       <target dev='vda' bus='virtio'/>
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file="{{ image_path }}/{{ vm.config_drive_iso }}"/>
+      <source file="{{ image_path }}/{{ item.config_drive_iso }}"/>
       <target dev='sda' />
    </disk>
    <interface type='network'>
