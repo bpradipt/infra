@@ -36,7 +36,7 @@ Create file `/usr/bin/qemu-kvm`
 ```
 cat <<EOF >> /usr/bin/qemu-kvm
 #!/bin/bash
-exec qemu-system-ppc64 -enable-kvm -object memory-backend-file,id=mem,size=2048M,mem-path=/dev/shm,share=on -numa node,memdev=mem "\$@"
+exec qemu-system-ppc64 -object memory-backend-file,id=mem,size=2048M,mem-path=/dev/shm,share=on -numa node,memdev=mem "\$@"
 EOF
 
 chmod +x /usr/bin/qemu-kvm
