@@ -41,7 +41,7 @@ EOF
 
 chmod +x /usr/bin/qemu-kvm
 ```
-
+N.B - This is not needed if building Kata from upstream since the required fixes for virtio-fs for ppc64le are already there
 ## Load Virtiofs module
 ```
 modprobe virtiofs
