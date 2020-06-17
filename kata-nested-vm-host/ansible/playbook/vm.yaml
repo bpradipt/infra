@@ -1,6 +1,8 @@
 ---
 - name: Setup VMs
   hosts: hypervisors
+  vars:
+    vm_template: "{{ 'templates/vm_template.xml.j2' if ansible_architecture == 'ppc64le' else 'templates/vm_template_amd64.xml.j2' }}"
   tasks:
     - name: Check if config directory exists
       stat:
@@ -56,7 +58,8 @@
       virt:
         command: define
         name: "{{ item.name }}"
-        xml: "{{ lookup('template', 'templates/vm_template.xml.j2') }}"
+        #xml: "{{ lookup('template', 'templates/vm_template.xml.j2') }}"
+        xml: "{{ lookup('template', vm_template) }}"
       when: item.name not in vm_list.list_vms
       loop: "{{ vms }}"
       loop_control:
