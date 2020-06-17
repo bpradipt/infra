@@ -59,7 +59,7 @@
       virt_pool:
         command: define
         name: default
-        xml: '{{ lookup("template", "default_storage_xml.j2") }}'
+        xml: '{{ lookup("template", "templates/default_storage_xml.j2") }}'
       when: '"default" not in pool_list.list_pools'
 
     - name: Get libvirt default pool status

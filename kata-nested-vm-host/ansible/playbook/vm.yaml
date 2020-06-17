@@ -36,7 +36,7 @@
 
     - name: Create Config Drive Input
       template:
-        src: config.yaml.j2
+        src: templates/config.yaml.j2
         dest: "{{ vm_config_path }}/{{ item.name }}_config.yaml"
       when: item.name not in vm_list.list_vms
       loop: "{{ vms }}"
@@ -56,7 +56,7 @@
       virt:
         command: define
         name: "{{ item.name }}"
-        xml: "{{ lookup('template', 'vm_template.xml.j2') }}"
+        xml: "{{ lookup('template', 'templates/vm_template.xml.j2') }}"
       when: item.name not in vm_list.list_vms
       loop: "{{ vms }}"
       loop_control:
