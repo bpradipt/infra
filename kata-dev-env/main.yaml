@@ -58,8 +58,6 @@
             - install
       become: yes
 
-      when: ansible_distribution_major_version == "8"
-
     - name: Create gopath directory
       file:
         path: "{{ HOME }}/gopath"
