@@ -5,9 +5,10 @@ image_path: /home/libvirt/image_store
 vm_config_path: /home/libvirt/vmconfig
 vms:
   - name: kata-fedora-00
-    image_download_url: https://download.fedoraproject.org/pub/fedora-secondary/releases/31/Cloud/ppc64le/images/Fedora-Cloud-Base-31-1.9.ppc64le.qcow2
-    image_base_name: fedora-31-base.qcow2
-    disk: fedora-31-derived-kata.qcow2
+    image_download_url: https://download.fedoraproject.org/pub/fedora-secondary/releases/32/Cloud/ppc64le/images/Fedora-Cloud-Base-32-1.6.ppc64le.qcow2
+    #image_download_url: https://download.fedoraproject.org/pub/fedora/linux/releases/32/Cloud/x86_64/images/Fedora-Cloud-Base-32-1.6.x86_64.qcow2
+    image_base_name: fedora-32-base.qcow2
+    disk: fedora-32-derived-kata.qcow2
     disk_size: 50G
     config_drive_iso: fedora-config-drive.iso
     cpus:
@@ -17,6 +18,7 @@ vms:
     ssh_key: ""
   - name: kata-ubuntu-00
     image_download_url: https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-ppc64el.img
+    #image_download_url: https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
     image_base_name: ubuntu-20.04-base.qcow2
     disk: ubuntu-20.04-derived-kata.qcow2
     disk_size: 50G
