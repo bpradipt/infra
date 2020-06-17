@@ -141,7 +141,8 @@
     - name: Enable nested KVM on Power
       lineinfile: 
         state: present
-        dest: /etc/modprobe.d/kvm.conf
+        create: yes
+        dest: /etc/modules-load.d//kvm.conf
         line: 'kvm_hv'
       become: yes
       when: ansible_architecture == "ppc64le"
