@@ -3,7 +3,6 @@ ansible_user: root
 ansible_python_interpreter: /usr/bin/python3
 image_path: /home/libvirt/image_store
 vm_config_path: /home/libvirt/vmconfig
-emulator: /usr/bin/qemu-system-ppc64
 vms:
   - name: kata-fedora-00
     image_download_url: https://download.fedoraproject.org/pub/fedora-secondary/releases/31/Cloud/ppc64le/images/Fedora-Cloud-Base-31-1.9.ppc64le.qcow2
