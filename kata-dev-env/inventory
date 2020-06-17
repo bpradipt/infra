@@ -1,0 +1,7 @@
+[Location]
+localhost         ansible_ssh_user=fedora
+
+[Location:vars]
+# For python3 systems
+ansible_python_interpreter=/usr/bin/python3
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'

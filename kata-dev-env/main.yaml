@@ -1,0 +1,145 @@
+# Setup Kata dev environment on Fedora 32 VM
+---
+- name: Setup Kata Dev Environment on Fedora
+  hosts: all
+  vars:
+    HOME: /home/fedora
+    GOLANG_VERSION: 1.13.9
+    GOLANG_ARCH: "{{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }}"
+    UpdateAllRPMs: no
+    F32:
+      - ansible
+      - bash-completion
+      - git
+      - gcc
+      - make
+      - wget
+      - libvirt-client
+      - libvirt
+      - qemu-kvm
+      - tmux
+      - vim
+    post_setup: |
+        - Reboot the node
+        - Git clone the kata src files
+
+  pre_tasks:
+    - name: Cleanup local known_hosts - hostname
+      delegate_to: localhost
+      connection: local
+      lineinfile:
+        regexp: "{{ ansible_fqdn }}"
+        path: ~/.ssh/known_hosts
+        state: absent
+
+    - name: Cleanup local known_hosts - IP address
+      delegate_to: localhost
+      connection: local
+      lineinfile:
+        regexp: "{{ ansible_default_ipv4.address }}"
+        path: ~/.ssh/known_hosts
+        state: absent
+  tasks:
+    - name: Install F32 packages
+      block:
+        - name: Installing packages
+          dnf:
+            name: "{{ F32 }}"
+            state: latest
+            update_cache: yes
+          tags:
+            - install
+        - name: Updating all system packages
+          dnf:
+            name: '*'
+            state: latest
+          when: UpdateAllRPMs
+          tags:
+            - install
+      become: yes
+
+      when: ansible_distribution_major_version == "8"
+
+    - name: Create gopath directory
+      file:
+        path: "{{ HOME }}/gopath"
+        state: directory
+
+    - name: check current golang version
+      command: bash -c "go version|sed -e 's/go version go//g'|cut -d' ' -f1"
+      ignore_errors: yes
+      register: current_go_version
+      changed_when: false
+ 
+    - debug: msg="current_go_version={{ current_go_version.stdout }}"
+    - debug: msg="required_go_version={{ GOLANG_VERSION }}"
+ 
+    - name: Go setup
+      block:
+        - name: Remove old installation of Go
+          file:
+            path: /usr/local/go
+            state: absent
+          become: yes
+    
+        - name: download golang tar
+          get_url:
+            url: "https://storage.googleapis.com/golang/go{{ GOLANG_VERSION }}.linux-{{ GOLANG_ARCH }}.tar.gz"
+            dest: "{{ HOME }}"
+
+        - name: Extract Golang
+          unarchive:
+            src: "{{ HOME }}/go{{ GOLANG_VERSION }}.linux-{{ GOLANG_ARCH }}.tar.gz"
+            dest: /usr/local
+            remote_src: yes
+          become: yes
+      when: current_go_version.stdout == "" or (current_go_version.stdout is version( GOLANG_VERSION , '<', strict=True))
+
+    - name: Ensuring encoding is set to en_US.utf-8
+      lineinfile:
+        path: "{{ HOME }}/.bashrc"
+        state: present
+        line: 'export LANG=en_US.UTF8'
+      tags:
+        - alias
+
+    - name: Set PATH/GOPATH
+      blockinfile:
+        path: "{{ HOME }}/.bashrc"
+        state: present
+        block: |
+          export GOPATH="{{ HOME }}/gopath"
+          export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+        marker: '# {mark} ANSIBLE MANAGED BLOCK - Golang Changes'
+        insertafter: EOF
+      tags:
+        - path
+
+    # Ref: https://stackoverflow.com/questions/39795873/ansible-lineinfile-modify-a-line
+    - name: Update Grub to enable cgroupv1
+      lineinfile:
+        state: present
+        dest: /etc/default/grub
+        backrefs: yes
+        regexp: '^(GRUB_CMDLINE_LINUX=(?!.* systemd.unified_cgroup_hierarchy)\"[^\"]+)(\".*)'
+        line: '\1 systemd.unified_cgroup_hierarchy=0\2'
+      become: yes
+
+    - name: Enable nested KVM on Intel
+      lineinfile: 
+        state: present
+        dest: /etc/modprobe.d/kvm.conf
+        line: 'options kvm_intel nested=1'
+      become: yes
+      when: ansible_architecture == "x86_64"
+ 
+    - name: Enable nested KVM on Power
+      lineinfile: 
+        state: present
+        dest: /etc/modprobe.d/kvm.conf
+        line: 'kvm_hv'
+      become: yes
+      when: ansible_architecture == "ppc64le"
+   
+    - name: Setup completed
+      debug: msg={{ post_setup.split('\n') }}
