@@ -117,13 +117,18 @@
 
     # Ref: https://stackoverflow.com/questions/39795873/ansible-lineinfile-modify-a-line
     - name: Update Grub to enable cgroupv1
-      lineinfile:
-        state: present
-        dest: /etc/default/grub
-        backrefs: yes
-        regexp: '^(GRUB_CMDLINE_LINUX=(?!.* systemd.unified_cgroup_hierarchy)\"[^\"]+)(\".*)'
-        line: '\1 systemd.unified_cgroup_hierarchy=0\2'
       become: yes
+      block:
+        - name: Update default grub commandline
+          lineinfile:
+            state: present
+            dest: /etc/default/grub
+            backrefs: yes
+            regexp: '^(GRUB_CMDLINE_LINUX=(?!.* systemd.unified_cgroup_hierarchy)\"[^\"]+)(\".*)'
+            line: '\1 systemd.unified_cgroup_hierarchy=0\2'
+        - name: update grub.cfg
+          shell:
+            cmd: grub2-mkconfig > /boot/grub2/grub.cfg
 
     - name: Enable nested KVM on Intel
       lineinfile: 
