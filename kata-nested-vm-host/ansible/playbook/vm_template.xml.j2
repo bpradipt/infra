@@ -1,4 +1,4 @@
-<domain type='kvm' >
+<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0' >
   <name>{{ item.name }}</name>
   <memory unit='KiB'>16777216</memory>
   <currentMemory unit='KiB'>16777216</currentMemory>
@@ -53,4 +53,8 @@
       <address type='usb' bus='0' port='1'/>
    </input>
   </devices>
+  <qemu:commandline>
+      <qemu:arg value='-M'/>
+      <qemu:arg value='pseries,cap-nested-hv=true'/>
+  </qemu:commandline>
 </domain>
