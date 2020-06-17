@@ -6,6 +6,12 @@
     HOME: /home/fedora
     GOLANG_VERSION: 1.13.9
     GOLANG_ARCH: "{{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }}"
+    KATA_DOWNLOAD_URL: "http://download.opensuse.org/repositories/home:/katacontainers:/releases:/{{ ansible_architecture }}:/master/Fedora_30/{{ ansible_architecture }}"
+    KATA_GUEST_KERNEL: "{{ 'kata-linux-container-5.4.32.73-62.1.x86_64.rpm' if ansible_architecture == 'x86_64' else 'kata-linux-container-5.4.32.79-10.1.ppc64le.rpm' }}"
+    KATA_GUEST_IMG: "{{ 'kata-containers-image-1.11.0~rc0-45.1.x86_64.rpm' if ansible_architecture == 'x86_64' else 'kata-containers-image-1.11.0~rc0-10.1.ppc64le.rpm' }}"
+    KATA_PKGS:
+      - "{{ KATA_DOWNLOAD_URL }}/{{ KATA_GUEST_KERNEL }}"
+      - "{{ KATA_DOWNLOAD_URL }}/{{ KATA_GUEST_IMG }}"
     UpdateAllRPMs: no
     F32:
       - ansible
@@ -145,5 +151,11 @@
       become: yes
       when: ansible_architecture == "ppc64le"
    
+    - name: Install Kata guest kernel and initird for quick start
+      dnf: 
+        name: "{{ KATA_PKGS }}"
+        state: present
+      become: yes
+
     - name: Setup completed
       debug: msg={{ post_setup.split('\n') }}
