@@ -125,4 +125,5 @@
 
     - name: Create kubeadm cluster
       shell: kubeadm init --config {{ playbook_dir }}/files/kubeadm_config.yaml
-
+      tags:
+        - kubeadm_init
