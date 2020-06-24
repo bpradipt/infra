@@ -14,6 +14,7 @@
       - wget
       - tmux
       - vim
+      - python3-libselinux
     sysctl_configs:
       - net.bridge.bridge-nf-call-ip6tables: 1
       - net.bridge.bridge-nf-call-iptables: 1
