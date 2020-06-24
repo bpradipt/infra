@@ -1,0 +1,17 @@
+ansible_python_interpreter: /usr/bin/python3
+image_path: /home/libvirt/image_store
+vm_config_path: /home/libvirt/vmconfig
+vm_basename: fedora32-test
+vms:
+  - name: "{{ vm_basename }}-00"
+    image_download_url: https://download.fedoraproject.org/pub/fedora-secondary/releases/32/Cloud/ppc64le/images/Fedora-Cloud-Base-32-1.6.ppc64le.qcow2
+    #image_download_url: https://download.fedoraproject.org/pub/fedora/linux/releases/32/Cloud/x86_64/images/Fedora-Cloud-Base-32-1.6.x86_64.qcow2
+    image_base_name: fedora-32-base.qcow2
+    disk: "{{ vm_basename }}-00-derived.qcow2"
+    disk_size: 50G
+    config_drive_iso: "{{ vm_basename }}-00-config-drive.iso"
+    cpus:
+    memory:
+    user: fedora
+    password: $y$j9T$eN1cYAhwHXBShRP5ZsM8e0$QqYFgDvsEfWpKNm9jOwjp.3zDZ/fDaUBIRMLh9YIZo8
+    ssh_key: ""
