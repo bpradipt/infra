@@ -1,0 +1,123 @@
+# Setup Kubernetes cluster on Fedora 32 VM
+---
+- name: Setup Kubernetes cluster on Fedora
+  hosts: all
+  become: yes
+  vars:
+    HOME: /home/fedora
+    UpdateAllRPMs: no
+    F32:
+      - bash-completion
+      - git
+      - gcc
+      - make
+      - wget
+      - tmux
+      - vim
+    sysctl_configs:
+      - net.bridge.bridge-nf-call-ip6tables: 1
+      - net.bridge.bridge-nf-call-iptables: 1
+    services:
+      - cri-o
+      - kubelet
+    repo_gpgkey:
+      - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+      - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+  pre_tasks:
+    - name: Cleanup local known_hosts - hostname
+      delegate_to: localhost
+      connection: local
+      lineinfile:
+        regexp: "{{ ansible_fqdn }}"
+        path: ~/.ssh/known_hosts
+        state: absent
+
+    - name: Cleanup local known_hosts - IP address
+      delegate_to: localhost
+      connection: local
+      lineinfile:
+        regexp: "{{ ansible_default_ipv4.address }}"
+        path: ~/.ssh/known_hosts
+        state: absent
+  tasks:
+    - name: Install F32 packages
+      block:
+        - name: Installing packages
+          dnf:
+            name: "{{ F32 }}"
+            state: latest
+            update_cache: yes
+          tags:
+            - install
+        - name: Updating all system packages
+          dnf:
+            name: '*'
+            state: latest
+          when: UpdateAllRPMs
+          tags:
+            - install
+
+    - name: Ensuring encoding is set to en_US.utf-8
+      lineinfile:
+        path: "{{ HOME }}/.bashrc"
+        state: present
+        line: 'export LANG=en_US.UTF8'
+      tags:
+        - alias
+
+
+    - name: Enable br_netfilter module
+      lineinfile: 
+        state: present
+        create: yes
+        dest: /etc/modules-load.d/br_netfilter.conf
+        line: 'br_netfilter'
+   
+    - name: Enable CRI-O
+      shell: dnf module enable cri-o:1.18 
+
+    - name: Install CRI-O
+      dnf: 
+        name: cri-o
+        state: present
+
+    - name: Enable sysctl settings
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/k8s.conf
+        state: present
+        reload: yes
+      with_dict: "{{ sysctl_configs }}"
+
+    - name: Add K8s repo
+      yum_repository:
+        name: kubernetes
+        description: Kubernetes repo
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+        gpgkey: "{{ repo_gpgkey }}"
+        exclude: kubelet kubeadm kubectl
+
+    - name: Install Kubernetes packages
+      dnf: 
+        name: kubelet, kubeadm, kubectl
+        disable_excludes: kubernetes
+        state: present
+
+    - name: Put SELinux in permissive mode
+      selinux:
+        policy: targeted
+        state: permissive
+
+    - name: Enable CRI-O and Kubelet
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      with_items: 
+        - "{{ services }}"
+
+    - name: Create kubeadm cluster
+      shell: kubeadm init --config {{ playbook_dir }}/files/kubeadm_config.yaml
+
