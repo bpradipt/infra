@@ -125,5 +125,7 @@
 
     - name: Create kubeadm cluster
       shell: kubeadm init --config {{ playbook_dir }}/files/kubeadm_config.yaml
+      register: debug_kubeadm_init
       tags:
         - kubeadm_init
+    - debug: var=debug_kubeadm_init.stdout_lines
