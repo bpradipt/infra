@@ -99,7 +99,7 @@
       yum_repository:
         name: kubernetes
         description: Kubernetes repo
-        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch
         gpgkey: "{{ repo_gpgkey }}"
         exclude: kubelet kubeadm kubectl
 
