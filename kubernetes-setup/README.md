@@ -36,3 +36,11 @@ To setup a worker node:
 ```
 ansible-playbook -i inventory main.yaml --skip-tags "kubeadm_init"
 ```
+
+To setup a single node cluster for kata developement:
+```
+sed -i -e 's/TaintedNode: no/TaintedNode: yes/' \
+       -e 's/SetupKataContainers: no/SetupKataContainers: yes/' \
+       main.yaml
+ansible-playbook -i inventory main.yaml
+```
