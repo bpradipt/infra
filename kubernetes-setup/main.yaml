@@ -8,6 +8,7 @@
     HOME: "/home/{{ User }}"
     UpdateAllRPMs: no
     TaintedNode: no
+    SetupKataContainers: no
     F32:
       - bash-completion
       - git
@@ -163,3 +164,48 @@
       when: TaintedNode
       tags:
         - tainted_node
+
+    - name: Install Kata Containers packages
+      dnf:
+        name: kata-runtime
+        state: present
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Create the kata runtime class
+      shell: kubectl apply -f {{ playbook_dir }}/files/kata_runtimeclass.yaml
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Create /etc/crio/crio.conf.d/
+      file:
+        path: /etc/crio/crio.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Create the CRI-O drop-in file for Kata Containers
+      copy:
+        src: "{{ playbook_dir }}/files/50-kata"
+        dest: /etc/crio/crio.conf.d/50-kata
+        owner: root
+        group: root
+        mode: '0644'
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Restart CRI-O service
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: cri-o
+      when: SetupKataContainers
+      tags:
+        - kata_containers
