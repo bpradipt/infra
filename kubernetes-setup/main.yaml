@@ -4,7 +4,8 @@
   hosts: all
   become: yes
   vars:
-    HOME: /home/fedora
+    User: fedora
+    HOME: "/home/{{ User }}"
     UpdateAllRPMs: no
     F32:
       - bash-completion
@@ -129,3 +130,29 @@
       tags:
         - kubeadm_init
     - debug: var=debug_kubeadm_init.stdout_lines
+
+    - name: Create {{ HOME }}/.kube for {{ User}}
+      file:
+        path: "{{ HOME }}/.kube"
+        state: directory
+      tags:
+        - kubeadm_init
+
+    # This is ugly, but when using the copy module I've faced some issues related to permissions.
+    - name: Copy the Kubernetes configuration file for {{ User }}
+      shell: cp -i /etc/kubernetes/admin.conf {{ HOME }}/.kube/config && chown {{ User }}:{{ User }}/.kube -R
+      tags:
+        - kubeadm_init
+
+    - name: Create ~/.kube for root
+      file:
+        path: ~/.kube
+        state: directory
+      tags:
+        - kubeadm_init
+
+    # This is ugly, but when using the copy module I've faced some issues related to permissions.
+    - name: Copy the Kubernetes configuration file for root
+      shell: cp -i /etc/kubernetes/admin.conf ~/.kube/config
+      tags:
+        - kubeadm_init
