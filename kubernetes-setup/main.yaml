@@ -4,8 +4,11 @@
   hosts: all
   become: yes
   vars:
-    HOME: /home/fedora
+    User: fedora
+    HOME: "/home/{{ User }}"
     UpdateAllRPMs: no
+    TaintedNode: no
+    SetupKataContainers: no
     F32:
       - bash-completion
       - git
@@ -129,3 +132,80 @@
       tags:
         - kubeadm_init
     - debug: var=debug_kubeadm_init.stdout_lines
+
+    - name: Create {{ HOME }}/.kube for {{ User}}
+      file:
+        path: "{{ HOME }}/.kube"
+        state: directory
+      tags:
+        - kubeadm_init
+
+    # This is ugly, but when using the copy module I've faced some issues related to permissions.
+    - name: Copy the Kubernetes configuration file for {{ User }}
+      shell: cp -i /etc/kubernetes/admin.conf {{ HOME }}/.kube/config && chown {{ User }}:{{ User }}/.kube -R
+      tags:
+        - kubeadm_init
+
+    - name: Create ~/.kube for root
+      file:
+        path: ~/.kube
+        state: directory
+      tags:
+        - kubeadm_init
+
+    # This is ugly, but when using the copy module I've faced some issues related to permissions.
+    - name: Copy the Kubernetes configuration file for root
+      shell: cp -i /etc/kubernetes/admin.conf ~/.kube/config
+      tags:
+        - kubeadm_init
+
+    - name: Allow scheduling Pods on the control-plane node
+      shell: kubectl taint nodes --all node-role.kubernetes.io/master-
+      when: TaintedNode
+      tags:
+        - tainted_node
+
+    - name: Install Kata Containers packages
+      dnf:
+        name: kata-runtime
+        state: present
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Create the kata runtime class
+      shell: kubectl apply -f {{ playbook_dir }}/files/kata_runtimeclass.yaml
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Create /etc/crio/crio.conf.d/
+      file:
+        path: /etc/crio/crio.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Create the CRI-O drop-in file for Kata Containers
+      copy:
+        src: "{{ playbook_dir }}/files/50-kata"
+        dest: /etc/crio/crio.conf.d/50-kata
+        owner: root
+        group: root
+        mode: '0644'
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
+    - name: Restart CRI-O service
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: cri-o
+      when: SetupKataContainers
+      tags:
+        - kata_containers
