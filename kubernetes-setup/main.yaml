@@ -136,8 +136,18 @@
       with_items: 
         - "{{ services }}"
 
+    - name: Copy kubeadm_config file
+      copy:
+        src: "{{ playbook_dir }}/files/kubeadm_config.yaml"
+        dest: "{{ HOME }}/kubeadm_config.yaml"
+        owner: root
+        group: root
+        mode: '0555'
+      tags:
+        - kubeadm_init
+
     - name: Create kubeadm cluster
-      shell: kubeadm init --config {{ playbook_dir }}/files/kubeadm_config.yaml
+      shell: kubeadm init --config {{ HOME }}/kubeadm_config.yaml
       register: debug_kubeadm_init
       tags:
         - kubeadm_init
