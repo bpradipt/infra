@@ -142,7 +142,7 @@
 
     # This is ugly, but when using the copy module I've faced some issues related to permissions.
     - name: Copy the Kubernetes configuration file for {{ User }}
-      shell: cp -i /etc/kubernetes/admin.conf {{ HOME }}/.kube/config && chown {{ User }}:{{ User }}/.kube -R
+      shell: cp -i /etc/kubernetes/admin.conf {{ HOME }}/.kube/config && chown {{ User }}:{{ User }} {{ HOME }}/.kube -R
       tags:
         - kubeadm_init
 
