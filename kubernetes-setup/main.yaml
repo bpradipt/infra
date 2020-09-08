@@ -45,6 +45,16 @@
         regexp: "{{ ansible_default_ipv4.address }}"
         path: ~/.ssh/known_hosts
         state: absent
+
+    - name: Disable swap
+      shell: swapoff -a
+
+    - name: Disable swap in fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\s+swap\s+swap\s+.*)'
+        replace: '# \1'
+
   tasks:
     - name: Install F32 packages
       block:
