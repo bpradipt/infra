@@ -52,7 +52,7 @@
     - name: Disable swap in fstab
       replace:
         path: /etc/fstab
-        regexp: '^([^#].*\s+swap\s+swap\s+.*)'
+        regexp: '^([^#].*\s+swap\s+.*)'
         replace: '# \1'
 
   tasks:
