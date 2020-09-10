@@ -55,6 +55,14 @@
         regexp: '^([^#].*\s+swap\s+.*)'
         replace: '# \1'
 
+    - name: Check kvm module
+      modprobe:
+         name: kvm
+         state: present
+      when: SetupKataContainers
+      tags:
+        - kata_containers
+
   tasks:
     - name: Install F32 packages
       block:
