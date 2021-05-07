@@ -1,0 +1,18 @@
+PACKAGES:
+  - ansible
+  - bash-completion
+  - git
+  - gcc
+  - make
+  - wget
+  - libvirt-clients
+  - libvirt0
+  - qemu-kvm
+  - tmux
+  - vim
+  - flex
+  - bison
+  - libelf-dev
+  - containerd
+GRUB_MKCONFIG: grub-mkconfig
+GRUB_CONFIG: /boot/grub/grub.cfg
