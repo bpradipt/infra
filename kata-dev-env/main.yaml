@@ -1,33 +1,17 @@
-# Setup Kata dev environment on Fedora 32 VM
+# Setup Kata dev environment on Fedora 32 or Ubuntu 20.04 VM
 ---
-- name: Setup Kata Dev Environment on Fedora
+- name: Setup Kata Dev Environment on {{ ansible_distribution }}
   hosts: all
   vars:
-    HOME: /home/fedora
+    HOME: /home/{{ ansible_ssh_user }}
+    X86_VENDOR: 'amd' # amd or intel
+    KATA_CONTAINERS_REPOSITORY: "github.com/kata-containers/kata-containers"
     GOLANG_VERSION: 1.13.9
     GOLANG_ARCH: "{{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }}"
-    KATA_DOWNLOAD_URL: "http://download.opensuse.org/repositories/home:/katacontainers:/releases:/{{ ansible_architecture }}:/master/Fedora_30/{{ ansible_architecture }}"
-    KATA_GUEST_KERNEL: "{{ 'kata-linux-container-5.4.32.73-62.1.x86_64.rpm' if ansible_architecture == 'x86_64' else 'kata-linux-container-5.4.32.79-10.1.ppc64le.rpm' }}"
-    KATA_GUEST_IMG: "{{ 'kata-containers-image-1.11.0~rc0-45.1.x86_64.rpm' if ansible_architecture == 'x86_64' else 'kata-containers-image-1.11.0~rc0-10.1.ppc64le.rpm' }}"
-    KATA_PKGS:
-      - "{{ KATA_DOWNLOAD_URL }}/{{ KATA_GUEST_KERNEL }}"
-      - "{{ KATA_DOWNLOAD_URL }}/{{ KATA_GUEST_IMG }}"
-    UpdateAllRPMs: no
-    F32:
-      - ansible
-      - bash-completion
-      - git
-      - gcc
-      - make
-      - wget
-      - libvirt-client
-      - libvirt
-      - qemu-kvm
-      - tmux
-      - vim
+    InstallKataPackages: no # not implemented on Ubuntu
+    UpdateAllPackages: no
     post_setup: |
         - Reboot the node
-        - Git clone the kata src files
 
   pre_tasks:
     - name: Cleanup local known_hosts - hostname
@@ -46,20 +30,21 @@
         path: ~/.ssh/known_hosts
         state: absent
   tasks:
-    - name: Install F32 packages
+    - name: Include distro specific vars
+      include_vars: vars-{{ ansible_distribution }}.yaml
+    - name: Install packages
       block:
         - name: Installing packages
-          dnf:
-            name: "{{ F32 }}"
+          package:
+            name: "{{ PACKAGES }}"
             state: latest
-            update_cache: yes
           tags:
             - install
         - name: Updating all system packages
-          dnf:
+          package:
             name: '*'
             state: latest
-          when: UpdateAllRPMs
+          when: UpdateAllPackages
           tags:
             - install
       become: yes
@@ -81,11 +66,17 @@
     - name: Go setup
       block:
         - name: Remove old installation of Go
-          file:
-            path: /usr/local/go
-            state: absent
+          block:
+            - name: Remove go package
+              package:
+                name: golang
+                state: absent
+            - name: Remove manually installed go
+              file:
+                path: /usr/local/go
+                state: absent
           become: yes
-    
+
         - name: download golang tar
           get_url:
             url: "https://storage.googleapis.com/golang/go{{ GOLANG_VERSION }}.linux-{{ GOLANG_ARCH }}.tar.gz"
@@ -98,6 +89,17 @@
             remote_src: yes
           become: yes
       when: current_go_version.stdout == "" or (current_go_version.stdout is version( GOLANG_VERSION , '<', strict=True))
+
+    - name: Rust Setup
+      shell: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | /bin/bash -s -- -y
+      args:
+        executable: /bin/bash
+
+    - name: Add musl rust target
+      shell: "{{ HOME }}/.cargo/bin/rustup target add x86_64-unknown-linux-musl ; sudo ln -sf /usr/bin/g++ /bin/musl-g++"
+      args:
+        executable: /bin/bash
+      when: ansible_architecture == 'x86_64'
 
     - name: Ensuring encoding is set to en_US.utf-8
       lineinfile:
@@ -132,13 +134,14 @@
             line: '\1 systemd.unified_cgroup_hierarchy=0\2'
         - name: update grub.cfg
           shell:
-            cmd: grub2-mkconfig > /boot/grub2/grub.cfg
+            cmd: "{{GRUB_MKCONFIG}} > {{GRUB_CONFIG}}"
 
-    - name: Enable nested KVM on Intel
-      lineinfile: 
+    - name: Enable nested KVM on X86
+      lineinfile:
+        create: yes
         state: present
         dest: /etc/modprobe.d/kvm.conf
-        line: 'options kvm_intel nested=1'
+        line: 'options kvm_{{ X86_VENDOR }} nested=1'
       become: yes
       when: ansible_architecture == "x86_64"
  
@@ -146,7 +149,7 @@
       lineinfile: 
         state: present
         create: yes
-        dest: /etc/modules-load.d//kvm.conf
+        dest: /etc/modules-load.d/kvm.conf
         line: 'kvm_hv'
       become: yes
       when: ansible_architecture == "ppc64le"
@@ -156,6 +159,12 @@
         name: "{{ KATA_PKGS }}"
         state: present
       become: yes
+      when: ansible_distribution == "Fedora" and InstallKataPackages == "yes"
+
+    - name: Pull kata-containers sources from Git
+      shell: go get -d -u {{ KATA_CONTAINERS_REPOSITORY }} || true
+      args:
+        executable: /bin/bash
 
     - name: Setup completed
       debug: msg={{ post_setup.split('\n') }}
