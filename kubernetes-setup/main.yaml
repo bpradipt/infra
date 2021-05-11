@@ -1,23 +1,14 @@
-# Setup Kubernetes cluster on Fedora 32 VM
+# Setup Kubernetes cluster on Fedora 32 and Ubuntu 20.04 VM
 ---
 - name: Setup Kubernetes cluster on Fedora
   hosts: all
   become: yes
   vars:
-    User: fedora
-    HOME: "/home/{{ User }}"
-    UpdateAllRPMs: no
+    HOME: "/home/{{ ansible_ssh_user }}"
+    UpdateAllPackages: no
     TaintedNode: no
     SetupKataContainers: no
-    F32:
-      - bash-completion
-      - git
-      - gcc
-      - make
-      - wget
-      - tmux
-      - vim
-      - python3-libselinux
+    IntallKataPackage: "{{ SetupKataContainers }}"
     sysctl_configs:
       - net.bridge.bridge-nf-call-ip6tables: 1
       - net.bridge.bridge-nf-call-iptables: 1
@@ -25,9 +16,6 @@
     services:
       - cri-o
       - kubelet
-    repo_gpgkey:
-      - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
-      - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 
   pre_tasks:
     - name: Cleanup local known_hosts - hostname
@@ -64,20 +52,21 @@
         - kata_containers
 
   tasks:
-    - name: Install F32 packages
+    - name: Include distro specific vars
+      include_vars: vars-{{ ansible_distribution }}.yaml
+    - name: Install packages
       block:
         - name: Installing packages
-          dnf:
-            name: "{{ F32 }}"
+          package:
+            name: "{{ PACKAGES }}"
             state: latest
-            update_cache: yes
           tags:
             - install
         - name: Updating all system packages
           dnf:
             name: '*'
             state: latest
-          when: UpdateAllRPMs
+          when: UpdateAllPackages
           tags:
             - install
 
@@ -102,11 +91,33 @@
    
     - name: Enable CRI-O
       shell: dnf module enable -y cri-o:1.18
+      when: ansible_distribution == "Fedora"
 
-    - name: Install CRI-O
-      dnf: 
+    - name: Install CRI-O on Fedora
+      dnf:
         name: cri-o
         state: present
+      when: ansible_distribution == "Fedora"
+
+    - name: Build & Install CRI-O on Ubuntu
+      shell: cd /tmp; \
+             git clone https://github.com/cri-o/cri-o; \
+             cd cri-o; \
+             make; \
+             make install
+      args:
+        executable: /bin/bash
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Build & Install conmon on Ubuntu
+      shell: cd /tmp; \
+             git clone https://github.com/containers/conmon; \
+             cd conmon; \
+             make; \
+             make install
+      args:
+        executable: /bin/bash
+      when: ansible_distribution == "Ubuntu"
 
     - name: Enable sysctl settings
       sysctl:
@@ -118,22 +129,45 @@
       with_dict: "{{ sysctl_configs }}"
 
     - name: Add K8s repo
-      yum_repository:
-        name: kubernetes
-        description: Kubernetes repo
-        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch
-        gpgkey: "{{ repo_gpgkey }}"
-        exclude: kubelet kubeadm kubectl
+      block:
+        - name: Add yum repository
+          yum_repository:
+            name: kubernetes
+            description: Kubernetes repo
+            baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch
+            gpgkey: "{{ REPO_GPGKEY }}"
+            exclude: kubelet kubeadm kubectl
+          when: ansible_distribution == "Fedora"
+        - name: Add apt repository
+          block:
+            - name: Add apt repository key
+              apt_key:
+                url: "{{ REPO_GPGKEY }}"
+                state: present
+            - name: Add apt repository
+              apt_repository:
+                repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+                state: present
+                update_cache: yes
+          when: ansible_distribution == "Ubuntu"
 
     - name: Install Kubernetes packages
-      dnf: 
-        name: kubelet, kubeadm, kubectl
-        disable_excludes: kubernetes
-        state: present
+      block:
+        - name: Install Kubernetes packages on Fedora
+          dnf:
+            name: kubelet, kubeadm, kubectl
+            disable_excludes: kubernetes
+            state: present
+          when: ansible_distribution == "Fedora"
+        - name: Install Kubernetes packages on Ubuntu
+          apt:
+            name: kubelet, kubeadm, kubectl
+            state: present
+          when: ansible_distribution == "Ubuntu"
 
     - name: Put SELinux in permissive mode
       selinux:
-        policy: targeted
+        policy: "{{ SELINUX_POLICY }}"
         state: permissive
 
     - name: Enable CRI-O and Kubelet
@@ -155,13 +189,13 @@
         - kubeadm_init
 
     - name: Create kubeadm cluster
-      shell: kubeadm init --config {{ HOME }}/kubeadm_config.yaml
+      shell: kubeadm reset -f && kubeadm init --config {{ HOME }}/kubeadm_config.yaml
       register: debug_kubeadm_init
       tags:
         - kubeadm_init
     - debug: var=debug_kubeadm_init.stdout_lines
 
-    - name: Create {{ HOME }}/.kube for {{ User}}
+    - name: Create {{ HOME }}/.kube for {{ ansible_ssh_user }}
       file:
         path: "{{ HOME }}/.kube"
         state: directory
@@ -169,8 +203,8 @@
         - kubeadm_init
 
     # This is ugly, but when using the copy module I've faced some issues related to permissions.
-    - name: Copy the Kubernetes configuration file for {{ User }}
-      shell: cp -f /etc/kubernetes/admin.conf {{ HOME }}/.kube/config && chown {{ User }}:{{ User }} {{ HOME }}/.kube -R
+    - name: Copy the Kubernetes configuration file for {{ ansible_ssh_user }}
+      shell: cp -f /etc/kubernetes/admin.conf {{ HOME }}/.kube/config && chown {{ ansible_ssh_user }}:{{ ansible_ssh_user }} {{ HOME }}/.kube -R
       tags:
         - kubeadm_init
 
@@ -193,11 +227,11 @@
       tags:
         - tainted_node
 
-    - name: Install Kata Containers packages
+    - name: Install Kata Containers packages on Fedora
       dnf:
         name: kata-runtime
         state: present
-      when: SetupKataContainers
+      when: IntallKataPackage and ansible_distribution == "Fedora"
       tags:
         - kata_containers
 

@@ -1,0 +1,13 @@
+PACKAGES:
+  - bash-completion
+  - git
+  - gcc
+  - make
+  - wget
+  - tmux
+  - vim
+  - python3-libselinux
+REPO_GPGKEY:
+  - https://packages.cloud.google.com/yum/doc/yum-key.gpg
+  - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+SELINUX_POLICY: targeted
