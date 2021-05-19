@@ -1,0 +1,31 @@
+PACKAGES:
+  - bash-completion
+  - git
+  - gcc
+  - make
+  - wget
+  - tmux
+  - vim
+  - python3-selinux
+  - selinux-policy-default
+  - runc
+  - git
+  - golang-go
+  - libassuan-dev
+  - libdevmapper-dev
+  - libglib2.0-dev
+  - libc6-dev
+  - libgpgme11-dev
+  - libgpg-error-dev
+  - libseccomp-dev
+  - libsystemd-dev
+  - libselinux1-dev
+  - pkg-config
+  - go-md2man
+  - libudev-dev
+  - software-properties-common
+  - gcc
+  - make
+REPO_GPGKEY:
+  - https://packages.cloud.google.com/yum/doc/apt-key.gpg
+SELINUX_POLICY: default
