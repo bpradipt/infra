@@ -1,0 +1,149 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  #Cluster name
+  name: test-aws
+  namespace: default
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 192.168.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: test-aws-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AWSCluster
+    name: test-aws
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AWSCluster
+metadata:
+  name: test-aws
+  namespace: default
+spec:
+  # AWS region to use
+  region: us-east-2
+  # SSH keypair name to be used to login to the VMs
+  # The keypair should be available in the specific region
+  sshKeyName: test-key-rh
+  # Bastion allows to SSH to the the cluster nodes which are in private subnet
+  bastion:
+    enabled: true
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: test-aws-control-plane
+  namespace: default
+spec:
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      apiServer:
+        extraArgs:
+          cloud-provider: aws
+      controllerManager:
+        extraArgs:
+          cloud-provider: aws
+    initConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          cloud-provider: aws
+        name: '{{ ds.meta_data.local_hostname }}'
+    joinConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          cloud-provider: aws
+        name: '{{ ds.meta_data.local_hostname }}'
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: AWSMachineTemplate
+      name: test-aws-control-plane
+  replicas: 1
+  # Kubernetes version to use
+  version: v1.24.0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AWSMachineTemplate
+metadata:
+  name: test-aws-control-plane
+  namespace: default
+spec:
+  template:
+    spec:
+      iamInstanceProfile: control-plane.cluster-api-provider-aws.sigs.k8s.io
+      # Instance type to be used for the control plane
+      instanceType: t3.large
+      # The SSH keypair should be available in the specific region
+      sshKeyName: test-key-rh
+      ami:
+        # The AMI to use for control plane nodes
+        # Example command to check available AMIs
+        # clusterawsadm ami list --kubernetes-version v1.24.0 --region  us-east-2
+        # Ubuntu 20.04 1.24 
+        id: ami-06c00e3da24b96bd1  
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: test-aws-md-0
+  namespace: default
+spec:
+  clusterName: test-aws
+  # Number of worker nodes to create.
+  replicas: 1
+  selector:
+    matchLabels: null
+  template:
+    spec:
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+          name: test-aws-md-0
+      clusterName: test-aws
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: AWSMachineTemplate
+        name: test-aws-md-0
+      version: v1.24.0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AWSMachineTemplate
+metadata:
+  name: test-aws-md-0
+  namespace: default
+spec:
+  template:
+    spec:
+      iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
+      # Instance type to be used for the worker nodes
+      instanceType: t3.large
+      # The SSH keypair should be available in the specific region
+      sshKeyName: test-key-rh
+      ami:
+        # The AMI to use for worker nodes
+        # Example command to check available AMIs
+        # clusterawsadm ami list --kubernetes-version v1.24.0 --region  us-east-2
+        # Ubuntu 20.04 1.24 
+        id: ami-06c00e3da24b96bd1  
+      # Root disk size for the worker nodes.   
+      rootVolume:
+        size: 60
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: test-aws-md-0
+  namespace: default
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          kubeletExtraArgs:
+            cloud-provider: aws
+          name: '{{ ds.meta_data.local_hostname }}'
