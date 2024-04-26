@@ -1,37 +1,46 @@
 ## Use the following command to get help on all the available parameters
 # "kcli info kube kubeadm"
 #
+# Cluster name
+cluster: criok8s 
 # Cluster domain name. Need not be a registered DNS name
-domain: testk8s.com
+domain: criok8s.local
 # OS image to be used
-image: fedora36
+image: fedora39
 
 # Uncomment and set the K8s version otherwise default for kubeadm is used
-#version: 
+version: 1.29.4
 
 # Libvirt network name
+# kcli create network -c 192.168.121.0/24  -P dhcp_start=192.168.121.1 -P dhcp_end=192.168.121.50 kubernetes
 network: kubernetes
 # Libvirt storage pool name
+# kcli create pool -t dir -p /var/lib/libvirt/images/kubernetes kubernetes
 pool: kubernetes
 
 # A free IP from the libvirt network
-api_ip: 192.168.121.100
+api_ip: 192.168.121.51
 
-masters: 1
-workers: 1
+ctrlplanes: 1
+#workers: 1
 
 # VM resources to be used for all the nodes - bootstrap, master, worker
-numcpus: 2
-memory: 16384
+numcpus: 4
+memory: 32768
 disk_size: 60
 
 # Uncomment and set these if you want to use custom memory and cpu for master nodes
-#master_memory:
-#master_numcpus:
+#ctlplanes_memory:
+#ctlplanes_numcpus:
 
 # Uncomment and set these if you want to use custom memory and cpu for worker nodes
 #worker_memory:
 #worker_numcpus:
 
 engine: crio
-sdn: weavenet
+engine_version: v1.29
+
+#sdn: calico
+multus: false
+
+nfs: false

@@ -2,57 +2,65 @@
 # "kcli info kube openshift"
 #
 # Cluster domain name. Need not be a registered DNS name
-domain: testocp.com
+domain: testocp.local
+cluster: coco
 # RHCOS image name in the libvirt storage pool
-image: rhcos410
-imagecontentsources: []
-mdns: True
+#image: rhcos415
+#imagecontentsources: []
+#mdns: True
 
 # Set this to True if you want disconnected installation
-disconnected_deploy: True
+#disconnected_deploy: True
 
 # Libvirt network name
-network: openshift
+#network: openshift
 # Libvirt storage pool name
-pool: openshift
+#pool: openshift
 
 # A free IP from the libvirt network
-api_ip: 192.168.10.254
+# Ensure you remove this IP from the DHCP list by editing
+# the libvirt network
+api_ip: 192.168.122.254
 
 # Copy the pull secret and store it the following file
-pull_secret: openshift_pull.json
+pull_secret: /home/kcli/ocp/openshift_pull_secret.json
 
 # Release version number: 4.9/4.10 ...
-tag: 4.10
+tag: 4.15
 
 # Build type: nightly/stable. The latest nightly or stable build will be automatically downloaded
 # If specific version is required then download openshift-install from
 # https://mirror.openshift.com/pub/openshift-v4/clients and
 # place it in "$PATH" to use the same for install
-version: nightly
+#version: nightly
+version: stable
 
-# Masters need to be 3 for OpenShift
-masters: 3
+# Modify it to 1 for SNO
+#ctlplanes: 3
+ctlplanes: 1
  
 # Modify the number of required worker nodes
-workers: 2
+#workers: 2
+workers: 0
 
 # VM resources to be used for all the nodes - bootstrap, master, worker
-numcpus: 4
-memory: 16384
-disk_size: 60
+#numcpus: 16
+#memory: 32768
+numcpus: 24
+memory: 65536
+disk_size: 80
 
 # Uncomment and set these if you want to use custom memory and cpu for bootstrap node
-#bootstrap_memory:
-#bootstrap_numcpus:
+bootstrap_memory: 24576
+bootstrap_numcpus: 16
 
 # Uncomment and set these if you want to use custom memory and cpu for master nodes
-#master_memory:
-#master_numcpus:
+#ctlplane_memory:
+#ctlplane_numcpus:
 
 # Uncomment and set these if you want to use custom memory and cpu for worker nodes
 #worker_memory:
 #worker_numcpus:
 
-# Defaults to OpenShiftSDN. Uncomment this to use OVNKubernetes
+# Defaults to OVNKubernetes
 #network_type: OVNKubernetes
