@@ -1,0 +1,65 @@
+# Tear down the Kubernetes cluster set up by main.yaml
+---
+- name: Tear down Kubernetes cluster
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Include distro specific vars
+      include_vars: vars-{{ ansible_distribution }}.yaml
+
+    - name: Uninstall kata-deploy helm release
+      shell: helm uninstall kata-deploy -n kube-system
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+        HOME: /root
+      failed_when: false
+
+    - name: Reset kubeadm
+      shell: kubeadm reset -f
+      failed_when: false
+
+    - name: Remove Kubernetes packages on Ubuntu
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+          - kubernetes-cni
+          - containerd.io
+        state: absent
+        purge: yes
+        autoremove: yes
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Remove Kubernetes and CRI-O packages on Fedora
+      dnf:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+          - cri-o
+        state: absent
+        autoremove: yes
+      when: ansible_distribution == "Fedora"
+
+    - name: Flush iptables rules
+      shell: |
+        iptables -F
+        iptables -t nat -F
+        iptables -t mangle -F
+        iptables -X
+
+    - name: Clean up data and config directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes
+        - /etc/containerd
+        - /etc/cni
+        - /opt/cni
+        - /var/lib/kubelet
+        - /var/lib/etcd
+        - /root/.kube
+        - "/home/{{ ansible_ssh_user }}/.kube"
