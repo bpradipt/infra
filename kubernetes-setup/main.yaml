@@ -1,18 +1,19 @@
-# Setup Kubernetes cluster on Fedora 32 and Ubuntu 20.04 VM
+# Setup Kubernetes cluster on Fedora and Ubuntu
 ---
-- name: Setup Kubernetes cluster on Fedora
+- name: Setup Kubernetes cluster
   hosts: all
   become: yes
   vars:
     HOME: "/home/{{ ansible_ssh_user }}"
     UpdateAllPackages: no
-    TaintedNode: no
-    SetupKataContainers: no
-    IntallKataPackage: "{{ SetupKataContainers }}"
+    TaintedNode: yes
+    SetupKataContainers: yes
+    kata_version: "3.28.0"
+    kubeadm_config_file: kubeadm_config.yaml
     sysctl_configs:
-      - net.bridge.bridge-nf-call-ip6tables: 1
-      - net.bridge.bridge-nf-call-iptables: 1
-      - net.ipv4.ip_forward: 1
+      net.bridge.bridge-nf-call-ip6tables: 1
+      net.bridge.bridge-nf-call-iptables: 1
+      net.ipv4.ip_forward: 1
     services:
       - cri-o
       - kubelet
@@ -25,6 +26,7 @@
         regexp: "{{ ansible_fqdn }}"
         path: ~/.ssh/known_hosts
         state: absent
+      when: ansible_connection != 'local'
 
     - name: Cleanup local known_hosts - IP address
       delegate_to: localhost
@@ -33,6 +35,7 @@
         regexp: "{{ ansible_default_ipv4.address }}"
         path: ~/.ssh/known_hosts
         state: absent
+      when: ansible_connection != 'local'
 
     - name: Disable swap
       shell: swapoff -a
@@ -48,25 +51,27 @@
          name: kvm
          state: present
       when: SetupKataContainers
+      ignore_errors: yes
       tags:
         - kata_containers
 
   tasks:
     - name: Include distro specific vars
       include_vars: vars-{{ ansible_distribution }}.yaml
+
     - name: Install packages
       block:
         - name: Installing packages
           package:
             name: "{{ PACKAGES }}"
-            state: latest
+            state: present
           tags:
             - install
         - name: Updating all system packages
           dnf:
             name: '*'
             state: latest
-          when: UpdateAllPackages
+          when: UpdateAllPackages and ansible_distribution == "Fedora"
           tags:
             - install
 
@@ -75,6 +80,7 @@
         path: "{{ HOME }}/.bashrc"
         state: present
         line: 'export LANG=en_US.UTF8'
+        create: yes
       tags:
         - alias
 
@@ -83,12 +89,12 @@
         cmd: modprobe br_netfilter
 
     - name: Enable br_netfilter module
-      lineinfile: 
+      lineinfile:
         state: present
         create: yes
         dest: /etc/modules-load.d/br_netfilter.conf
         line: 'br_netfilter'
-   
+
     - name: Enable CRI-O
       shell: dnf module enable -y cri-o:1.18
       when: ansible_distribution == "Fedora"
@@ -99,24 +105,23 @@
         state: present
       when: ansible_distribution == "Fedora"
 
-    - name: Build & Install CRI-O on Ubuntu
-      shell: cd /tmp; \
-             git clone https://github.com/cri-o/cri-o; \
-             cd cri-o; \
-             make; \
-             make install
-      args:
-        executable: /bin/bash
-      when: ansible_distribution == "Ubuntu"
+    - name: Configure containerd for Kubernetes on Ubuntu
+      block:
+        - name: Ensure containerd config directory exists
+          file:
+            path: /etc/containerd
+            state: directory
 
-    - name: Build & Install conmon on Ubuntu
-      shell: cd /tmp; \
-             git clone https://github.com/containers/conmon; \
-             cd conmon; \
-             make; \
-             make install
-      args:
-        executable: /bin/bash
+        - name: Generate default containerd config
+          shell: containerd config default > /etc/containerd/config.toml
+          args:
+            creates: /etc/containerd/config.toml
+
+        - name: Enable SystemdCgroup in containerd config
+          replace:
+            path: /etc/containerd/config.toml
+            regexp: 'SystemdCgroup = false'
+            replace: 'SystemdCgroup = true'
       when: ansible_distribution == "Ubuntu"
 
     - name: Enable sysctl settings
@@ -140,13 +145,21 @@
           when: ansible_distribution == "Fedora"
         - name: Add apt repository
           block:
-            - name: Add apt repository key
-              apt_key:
-                url: "{{ REPO_GPGKEY }}"
-                state: present
-            - name: Add apt repository
+            - name: Create keyrings directory
+              file:
+                path: /etc/apt/keyrings
+                state: directory
+                mode: '0755'
+            - name: Add K8s apt repository key
+              shell: |
+                curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | \
+                  gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+              args:
+                creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+            - name: Add K8s apt repository
               apt_repository:
-                repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+                repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /"
+                filename: kubernetes
                 state: present
                 update_cache: yes
           when: ansible_distribution == "Ubuntu"
@@ -155,13 +168,19 @@
       block:
         - name: Install Kubernetes packages on Fedora
           dnf:
-            name: kubelet, kubeadm, kubectl
+            name:
+              - kubelet
+              - kubeadm
+              - kubectl
             disable_excludes: kubernetes
             state: present
           when: ansible_distribution == "Fedora"
         - name: Install Kubernetes packages on Ubuntu
           apt:
-            name: kubelet, kubeadm, kubectl
+            name:
+              - kubelet
+              - kubeadm
+              - kubectl
             state: present
           when: ansible_distribution == "Ubuntu"
 
@@ -169,18 +188,19 @@
       selinux:
         policy: "{{ SELINUX_POLICY }}"
         state: permissive
+      when: ansible_distribution == "Fedora"
 
-    - name: Enable CRI-O and Kubelet
+    - name: Enable container runtime and kubelet
       systemd:
         name: "{{ item }}"
         state: started
         enabled: yes
-      with_items: 
+      with_items:
         - "{{ services }}"
 
     - name: Copy kubeadm_config file
       copy:
-        src: "{{ playbook_dir }}/files/kubeadm_config.yaml"
+        src: "{{ playbook_dir }}/files/{{ kubeadm_config_file }}"
         dest: "{{ HOME }}/kubeadm_config.yaml"
         owner: root
         group: root
@@ -202,7 +222,6 @@
       tags:
         - kubeadm_init
 
-    # This is ugly, but when using the copy module I've faced some issues related to permissions.
     - name: Copy the Kubernetes configuration file for {{ ansible_ssh_user }}
       shell: cp -f /etc/kubernetes/admin.conf {{ HOME }}/.kube/config && chown {{ ansible_ssh_user }}:{{ ansible_ssh_user }} {{ HOME }}/.kube -R
       tags:
@@ -215,59 +234,57 @@
       tags:
         - kubeadm_init
 
-    # This is ugly, but when using the copy module I've faced some issues related to permissions.
     - name: Copy the Kubernetes configuration file for root
       shell: cp -f /etc/kubernetes/admin.conf ~/.kube/config
       tags:
         - kubeadm_init
 
+    - name: Restore CNI plugin binaries on Ubuntu after kubeadm reset
+      shell: apt-get install --reinstall -y kubernetes-cni
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      when: ansible_distribution == "Ubuntu"
+      tags:
+        - kubeadm_init
+
+    - name: Install Flannel CNI
+      shell: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      tags:
+        - kubeadm_init
+
     - name: Allow scheduling Pods on the control-plane node
-      shell: kubectl taint nodes --all node-role.kubernetes.io/master-
+      shell: |
+        kubectl taint nodes --all node-role.kubernetes.io/control-plane- 2>/dev/null || true
+        kubectl taint nodes --all node-role.kubernetes.io/master- 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
       when: TaintedNode
       tags:
         - tainted_node
 
-    - name: Install Kata Containers packages on Fedora
-      dnf:
-        name: kata-runtime
-        state: present
-      when: IntallKataPackage and ansible_distribution == "Fedora"
-      tags:
-        - kata_containers
-
-    - name: Create the kata runtime class
-      shell: kubectl apply -f {{ playbook_dir }}/files/kata_runtimeclass.yaml
+    - name: Install Kata Containers via helm
+      shell: |
+        helm upgrade --install kata-deploy \
+          oci://ghcr.io/kata-containers/kata-deploy-charts/kata-deploy \
+          --version {{ kata_version }} \
+          --namespace kube-system \
+          --set k8sDistribution=k8s \
+          --set shims.disableAll=true \
+          --set shims.qemu.enabled=true \
+          --wait --timeout 10m
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+        HOME: /root
       when: SetupKataContainers
       tags:
         - kata_containers
 
-    - name: Create /etc/crio/crio.conf.d/
-      file:
-        path: /etc/crio/crio.conf.d
-        state: directory
-        owner: root
-        group: root
-        mode: '0755'
-      when: SetupKataContainers
-      tags:
-        - kata_containers
-
-    - name: Create the CRI-O drop-in file for Kata Containers
-      copy:
-        src: "{{ playbook_dir }}/files/50-kata"
-        dest: /etc/crio/crio.conf.d/50-kata
-        owner: root
-        group: root
-        mode: '0644'
-      when: SetupKataContainers
-      tags:
-        - kata_containers
-
-    - name: Restart CRI-O service
-      systemd:
-        state: restarted
-        daemon_reload: yes
-        name: cri-o
+    - name: Wait for kata-deploy daemonset rollout
+      shell: kubectl rollout status daemonset/kata-deploy -n kube-system --timeout=5m
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
       when: SetupKataContainers
       tags:
         - kata_containers

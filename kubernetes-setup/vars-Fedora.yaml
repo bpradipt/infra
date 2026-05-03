@@ -11,3 +11,7 @@ REPO_GPGKEY:
   - https://packages.cloud.google.com/yum/doc/yum-key.gpg
   - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
 SELINUX_POLICY: targeted
+services:
+  - cri-o
+  - kubelet
+kubeadm_config_file: kubeadm_config.yaml
