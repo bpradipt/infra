@@ -8,6 +8,7 @@ PACKAGES:
   - gnupg
   - apt-transport-https
   - ca-certificates
+  - containerd.io
 REPO_GPGKEY:
   - https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key
 SELINUX_POLICY: default
